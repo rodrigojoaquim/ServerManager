@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../css/css.css">
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <title>Status</title>
+</head>
+<body>
+
+    <div class="scanlines"></div>
+
+    <header id="topbar">
+        <div id="topbar-inner">
+            <div id="brand">
+                <span id="brand-mark">&gt;_</span>
+                <span id="brand-text">STATUS<span class="cursor">&nbsp;</span></span>
+            </div>
+            <div id="conn">
+                <span id="conn-dot"></span>
+                <span id="conn-label">A LIGAR...</span>
+            </div>
+        </div>
+    </header>
+
+    <main id="container">
+
+        <section class="card" data-metric="cpu">
+            <div class="card-head">
+                <span class="card-eyebrow">01 / PROCESSADOR</span>
+                <span class="card-tag" id="cpu-tag">--</span>
+            </div>
+            <div class="gauge-wrap">
+                <div class="gauge-readout">
+                    <span class="gauge-value" id="cpu">0</span>
+                    <span class="gauge-unit">%</span>
+                </div>
+                <svg viewBox="0 0 200 200" class="gauge">
+                    <circle class="gauge-track" cx="100" cy="100" r="84"></circle>
+                    <circle class="gauge-fill" id="cpu-fill" cx="100" cy="100" r="84"></circle>
+                </svg>
+            </div>
+            <div class="card-foot">CPU</div>
+        </section>
+
+        <section class="card" data-metric="ram">
+            <div class="card-head">
+                <span class="card-eyebrow">02 / MEMÓRIA</span>
+                <span class="card-tag" id="ram-tag">--</span>
+            </div>
+            <div class="stat-wrap">
+                <div class="stat-value-row">
+                    <span class="stat-value" id="ram">0</span>
+                    <span class="stat-unit">GB</span>
+                    <span class="stat-value">/</span>
+                    <span class="stat-value" id="ram-total">0</span>
+                    <span class="stat-unit">GB</span>
+                </div>
+                <div class="stat-bar-track">
+                    <div class="stat-bar-fill" id="ram-bar"></div>
+                </div>
+                <span class="stat-caption">em uso</span>
+            </div>
+            <div class="card-foot">RAM</div>
+        </section>
+
+        <section class="card" data-metric="disco">
+            <div class="card-head">
+                <span class="card-eyebrow">03 / ARMAZENAMENTO</span>
+            </div>
+            <main id="disks-container"></main>
+            <div class="card-foot">DISCO</div>
+        </section>
+
+    </main>
+
+    <footer id="footbar">
+        <span id="last-update">última atualização: --:--:--</span>
+    </footer>
+
+</body>
+<script>
+    const CIRC = 2 * Math.PI * 84;
+
+    const el = {
+        cpu: document.getElementById("cpu"),
+        cpuFill: document.getElementById("cpu-fill"),
+        cpuTag: document.getElementById("cpu-tag"),
+        ram: document.getElementById("ram"),
+        ramBar: document.getElementById("ram-bar"),
+        ramTag: document.getElementById("ram-tag"),
+        ramTotal: document.getElementById("ram-total"),
+        disksContainer: document.getElementById("disks-container"),
+        connDot: document.getElementById("conn-dot"),
+        connLabel: document.getElementById("conn-label"),
+        lastUpdate: document.getElementById("last-update"),
+    };
+
+    el.cpuFill.style.strokeDasharray = `${CIRC}`;
+    el.cpuFill.style.strokeDashoffset = `${CIRC}`;
+
+    function tagFor(value){
+        if (value >= 85) return { text: "CRÍTICO", cls: "tag-crit" };
+        if (value >= 60) return { text: "ELEVADO", cls: "tag-warn" };
+        return { text: "NORMAL", cls: "tag-ok" };
+    }
+
+    function strokeClassFor(cls){
+        return cls === "tag-ok" ? "stroke-ok" : cls === "tag-warn" ? "stroke-warn" : "stroke-crit";
+    }
+
+    function setGauge(circle, tagEl, value){
+        const pct = Math.max(0, Math.min(100, value));
+        const offset = CIRC - (pct / 100) * CIRC;
+        circle.style.strokeDashoffset = `${offset}`;
+        const t = tagFor(pct);
+        if (tagEl){
+            tagEl.textContent = t.text;
+            tagEl.className = "card-tag " + t.cls;
+        }
+        circle.classList.remove("stroke-ok", "stroke-warn", "stroke-crit");
+        circle.classList.add(strokeClassFor(t.cls));
+    }
+
+    function diskLabel(d, i){
+        return d.mount || d.name || d.path || d.device || ("DISCO " + (i + 1));
+    }
+
+    function renderDisks(disks){
+        el.disksContainer.innerHTML = disks.map((d, i) => {
+            const use = Number(d.use);
+            const t = tagFor(Math.max(0, Math.min(100, use)));
+            return `
+                <section class="disk" data-metric="disco-${i}">
+                    <div class="card-head">
+                        <span class="card-eyebrow">${diskLabel(d, i)}</span>
+                        <span class="card-tag ${t.cls}">${t.text}</span>
+                    </div>
+                    <div class="gauge-disk-wrap">
+                        <div class="gauge-readout">
+                            <span class="gauge-value">${use}</span>
+                            <span class="gauge-unit">%</span>
+                        </div>
+                        <svg viewBox="0 0 200 200" class="gauge">
+                            <circle class="gauge-track" cx="100" cy="100" r="84"></circle>
+                            <circle class="gauge-fill ${strokeClassFor(t.cls)}" cx="100" cy="100" r="84"
+                                style="stroke-dasharray:${CIRC};stroke-dashoffset:${CIRC - (Math.max(0, Math.min(100, use)) / 100) * CIRC}">
+                            </circle>
+                        </svg>
+                    </div>
+                    <div class="card-foot">DISCO ${i + 1}</div>
+                </section>
+            `;
+        }).join("");
+    }
+
+    const socket = io("http://100.126.97.4:3000");
+
+    socket.on("connect", () => {
+        el.connDot.classList.remove("offline");
+        el.connDot.classList.add("online");
+        el.connLabel.textContent = "LIGADO";
+        socket.emit("request_status");
+    });
+
+    socket.on("disconnect", () => {
+        el.connDot.classList.remove("online");
+        el.connDot.classList.add("offline");
+        el.connLabel.textContent = "DESLIGADO";
+    });
+
+    socket.emit("request_status");
+
+    socket.on("send_status", (data) => {
+        el.cpu.textContent = data.cpu;
+        setGauge(el.cpuFill, el.cpuTag, Number(data.cpu));
+
+        el.ram.textContent = data.ram.usada;
+        el.ramTotal.textContent = data.ram.total;
+        el.ramTag.textContent = "EM USO";
+        el.ramBar.style.width = Math.min(100, (Number(data.ram.usada) / Number(data.ram.total)) * 100) + "%";
+
+        renderDisks(data.disco);
+
+        el.lastUpdate.textContent = "última atualização: " + new Date().toLocaleTimeString("pt-PT");
+    });
+
+    /*
+    function requestmsg(){
+        socket.emit("request_msg")
+    }
+
+    chats = document.getElementById("chat")
+
+    socket.on("send_chat", (data) => {
+        chat = ""
+        for (let i = 0; i < data.length; i++) {
+            console.log(data[i])
+            chat += `<div id = "msg_container">
+                <div id = nome_chat>${data[i].nome}</div>
+                <div id = msg_chat>${data[i].msg}</div>
+                <div id = hora>${data[i].time}</div>
+                </div>`
+        }
+        chats.innerHTML = chat
+    });
+
+    socket.on("pong", (data) => {
+        console.log("Server replied:", data);
+    });
+
+    btn = document.getElementById("btn")
+    msg = document.getElementById("msg")
+    nome = document.getElementById("nome")
+
+    btn.addEventListener("click", function (e) {
+        if (nome.value !== "" && msg.value !== ""){
+            socket.emit("send_msg", {
+                nome : nome.value,
+                msg : msg.value,
+                time: new Date().toLocaleTimeString()
+            });
+        }
+    });
+    */
+</script>
+</html>
