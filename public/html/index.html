@@ -8,7 +8,7 @@
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="../css/css.css">
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-    <title>Status</title>
+    <title>RexServer</title>
 </head>
 <body>
 
@@ -16,9 +16,10 @@
 
     <header id="topbar">
         <div id="topbar-inner">
-            <div id="brand">
-                <span id="brand-mark">&gt;_</span>
-                <span id="brand-text">STATUS<span class="cursor">&nbsp;</span></span>
+            <div id="navbar">
+                <a href="/" id="section">Status</a>
+                <a href="programas" id="section">Program</a>
+                <a href="https://rexserver:40120" id="section">TX</a>
             </div>
             <div id="conn">
                 <span id="conn-dot"></span>
@@ -187,6 +188,10 @@
         renderDisks(data.disco);
 
         el.lastUpdate.textContent = "última atualização: " + new Date().toLocaleTimeString("pt-PT");
+    });
+
+    socket.on("alerta_sistema", (mensagem) => {
+        alert(mensagem);
     });
 
     /*

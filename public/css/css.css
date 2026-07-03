@@ -66,22 +66,14 @@ body{
     justify-content: space-between;
 }
 
-#brand{
-    display: flex;
-    align-items: baseline;
-    gap: 10px;
-    letter-spacing: 0.12em;
+#section{
+    font-size: 20px;
+    color: var(--text);
+    text-decoration: none;
 }
 
-#brand-mark{
+#section:hover{
     color: var(--accent-ok);
-    font-weight: 700;
-    font-size: 22px;
-}
-
-#brand-text{
-    font-size: 26px;
-    font-weight: 800;
 }
 
 .cursor{
@@ -307,6 +299,76 @@ body{
     font-size: 11px;
     letter-spacing: 0.1em;
     color: var(--text-muted);
+}
+
+
+.btn-programa{
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 12px;
+    font-weight: 600;
+    width: inherit;
+    letter-spacing: 0.08em;
+    color: var(--text);
+    background: linear-gradient(180deg, var(--panel) 0%, #0e131a 100%);
+    border: 1px solid var(--panel-border);
+    border-radius: 4px;
+    padding: 12px 18px;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.2s ease, color 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+}
+ 
+.btn-programa::before{
+    content: "\276F";
+    color: var(--accent-ok);
+    margin-right: 8px;
+    opacity: 0.8;
+}
+ 
+.btn-programa::after{
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent-ok), transparent);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+ 
+.btn-programa:hover{
+    color: var(--accent-ok);
+    border-color: color-mix(in srgb, var(--accent-ok) 45%, var(--panel-border));
+    box-shadow: 0 0 14px color-mix(in srgb, var(--accent-ok) 25%, transparent);
+    transform: translateY(-1px);
+}
+ 
+.btn-programa:hover::after{
+    opacity: 0.6;
+}
+ 
+.btn-programa:active{
+    transform: translateY(0);
+    color: var(--bg);
+    background: var(--accent-ok);
+    border-color: var(--accent-ok);
+    box-shadow: 0 0 18px color-mix(in srgb, var(--accent-ok) 60%, transparent);
+}
+ 
+.btn-programa:active::before{
+    color: var(--bg);
+}
+ 
+.btn-programa:focus-visible{
+    outline: 2px solid var(--accent-ok);
+    outline-offset: 2px;
+}
+ 
+.btn-programa:disabled{
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
 }
 
 @media (max-width: 780px){

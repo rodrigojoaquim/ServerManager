@@ -1,6 +1,8 @@
 const express = require('express')
 const path = require('path')
 const si = require('systeminformation');
+const { exec } = require('child_process');
+const fs = require('fs').promises;
 const io = require('socket.io')(3000,{
   cors: {
     origin: "*"
@@ -32,6 +34,10 @@ app.get("/",(req,res)=>{
     res.sendFile(path.join(__dirname,"public","html/index.html"))
 })
 
+app.get("/programas",(req,res)=>{
+    res.sendFile(path.join(__dirname,"public","html/Program.html"))
+})
+
 async function obterEstatisticas() {
     try {
         const cpu = await si.currentLoad();
@@ -60,6 +66,39 @@ async function obterEstatisticas() {
         console.error("Erro a ler os dados do sistema:", erro);
     }
 }
+
+async function procurarScriptsRunning() {
+    try {
+        const sessionsRaw = await fs.readdir('/run/screen/S-rex');
+
+        const sessions = sessionsRaw.map((name) => {
+            const posicao = name.indexOf(".");
+            
+            return name.slice(posicao + 1);
+        });
+
+        return sessions; 
+
+    } catch (erro) {
+        console.error("Erro ao ler a pasta do utilizador:", erro);
+        return [];
+    }
+}
+
+async function procurarScripts() {
+    try {
+        const todosOsFicheiros = await fs.readdir('/home/rex');
+
+        const scripts = todosOsFicheiros.filter(ficheiro => ficheiro.endsWith('.sh'));
+
+        return scripts; 
+
+    } catch (erro) {
+        console.error("Erro ao ler a pasta do utilizador:", erro);
+        return [];
+    }
+}
+
 
 io.on("connection", (socket) => {
 
@@ -90,6 +129,104 @@ io.on("connection", (socket) => {
             socket.emit("send_status", data);
         });
     }, 5000);
+
+    socket.on("request_program", (data) => {
+        procurarScripts().then((data) => {
+            socket.emit("send_program", data);
+        });
+    })
+
+    socket.on("request_program_running", (data) => {
+        procurarScriptsRunning().then((data) => {
+            socket.emit("send_program_running", data);
+        });
+    })
+
+    socket.on("comando_programa", async (nomeDoPrograma) => {
+        console.log(`Pedido para correr: ${nomeDoPrograma}`);
+
+        const scriptsPermitidos = await procurarScripts(); 
+        
+        if (!scriptsPermitidos.includes(nomeDoPrograma)) {
+            console.error(`Tentativa de execução bloqueada: ${nomeDoPrograma}`);
+            socket.emit("alerta_sistema", `Tentativa de execução bloqueada: ${nomeDoPrograma}`);
+            return;
+        }
+
+        const caminhoCompleto = `/home/rex/${nomeDoPrograma}`;
+
+        exec(`bash ${caminhoCompleto}`, (erro, stdout, stderr) => {
+            
+            if (erro) {
+                console.error(`Erro ao executar ${nomeDoPrograma}:`, erro.message);
+                socket.emit("alerta_sistema", `Erro ao executar ${nomeDoPrograma}: ${erro.message}`);
+                return;
+            }
+
+            if (stderr == "A sessão ./${nomeDoPrograma} já está a correr") {
+                console.log(`Aviso do ${nomeDoPrograma}:`, stderr);
+                socket.emit("alerta_sistema", `Aviso do ${nomeDoPrograma}`);
+            }
+
+            if (stderr) {
+                console.log(`Aviso do ${nomeDoPrograma}:`, stderr);
+                socket.emit("alerta_sistema", `Aviso do ${nomeDoPrograma}: ${stderr}`);
+            }
+
+            //console.log(`Sucesso! Resultado do ${nomeDoPrograma}:\n${stdout}`);
+            socket.emit("alerta_sistema", `${nomeDoPrograma} Iniciado com sucesso.`);
+
+        });
+
+        setTimeout(() => {
+            procurarScriptsRunning().then((data) => {
+                socket.emit("send_program_running", data);
+            });
+        }, 500);
+    });
+
+    socket.on("end_program", (nomeDoPrograma) => {
+        console.log(`Pedido para terminar: ${nomeDoPrograma}`);
+    
+        exec(`screen -S ${nomeDoPrograma} -p 0 -X stuff "^C"`, (erro, stdout, stderr) => {
+            if (erro) {
+                console.error(`Erro ao terminar ${nomeDoPrograma}`);
+                socket.emit("alerta_sistema", `Erro ao terminar ${nomeDoPrograma}`);
+                return;
+            }
+            procurarScriptsRunning().then((data) => {
+                socket.emit("send_program_running", data);
+            });
+        });
+
+        setTimeout(() => {
+            procurarScriptsRunning().then((data) => {
+                socket.emit("send_program_running", data);
+            });
+        }, 500);
+
+    });
+
+    socket.on("shutdown", (data) => {
+        console.log("Pedido de DESLIGAR recebido do administrador.");
+        exec("sudo /sbin/shutdown -h now", (erro, stdout, stderr) => {
+            if (erro) {
+                console.error(`Erro ao desligar: ${erro.message}`);
+                return;
+            }
+        });
+    });
+
+    socket.on("restart", (data) => {
+        console.log("Pedido de REINÍCIO recebido do administrador.");
+        
+        exec("sudo /sbin/reboot", (erro, stdout, stderr) => {
+            if (erro) {
+                console.error(`Erro ao reiniciar: ${erro.message}`);
+                return;
+            }
+        });
+    });
 
     socket.on("disconnect", () => {
         console.log(`Cliente ${socket.id} fechou a página.`);

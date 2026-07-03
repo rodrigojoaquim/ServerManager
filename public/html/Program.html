@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../css/css.css">
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <title>RexServer</title>
+</head>
+<body onload="requestprogram()">
+
+    <div class="scanlines"></div>
+
+    <header id="topbar">
+        <div id="topbar-inner">
+            <div id="navbar">
+                <a href="/" id="section">Status</a>
+                <a href="programas" id="section">Program</a>
+                <a href="http://rexserver:40120" id="section">TX</a>
+            </div>
+            <div id="conn">
+                <span id="conn-dot"></span>
+                <span id="conn-label">A LIGAR...</span>
+            </div>
+        </div>
+    </header>
+
+    <main id="container">
+
+        <section class="card" data-metric="principal">
+            <div class="card-head">
+                <span class="card-eyebrow">01 / ServerManager</span>
+            </div>
+            <div class="stat-wrap">
+                <button class="btn-programa" id="restart">Reiniciar</button>
+                <button class="btn-programa" id="shutdown">Desligar</button>
+            </div>
+            <div class="card-foot">Main</div>
+        </section>
+
+        <section class="card" data-metric="programs">
+            <div class="card-head">
+                <span class="card-eyebrow">02 / Programs</span>
+            </div>
+            <div class="stat-wrap" id="programs-container">
+                
+            </div>
+            <div class="card-foot">programs</div>
+        </section>
+
+        <section class="card" data-metric="programs">
+            <div class="card-head">
+                <span class="card-eyebrow">03 / Programs Running</span>
+            </div>
+            <div class="stat-wrap" id="programs-running-container">
+                
+            </div>
+            <div class="card-foot">Running programs</div>
+        </section>
+
+    </main>
+
+    <footer id="footbar">
+        <span id="last-update">última atualização: --:--:--</span>
+    </footer>
+
+</body>
+<script>
+
+    const el = {
+        restart: document.getElementById("restart"),
+        shutdown: document.getElementById("shutdown"),
+        connDot: document.getElementById("conn-dot"),
+        connLabel: document.getElementById("conn-label"),
+        lastUpdate: document.getElementById("last-update"),
+    };
+
+    const socket = io("http://rexserver:3000");
+
+    function requestprogram(){
+        socket.emit("request_program");
+        socket.emit("request_program_running");
+    }
+    
+
+    socket.on("connect", () => {
+        el.connDot.classList.remove("offline");
+        el.connDot.classList.add("online");
+        el.connLabel.textContent = "LIGADO";
+        socket.emit("request_status");
+    });
+
+    socket.on("disconnect", () => {
+        el.connDot.classList.remove("online");
+        el.connDot.classList.add("offline");
+        el.connLabel.textContent = "DESLIGADO";
+    });
+
+    socket.on("send_program", (data) => {
+        const programas = data;
+        const contentor = document.getElementById("programs-container");
+        contentor.innerHTML = ""; // Limpa a lista antiga para não duplicar
+        programas.forEach(nomeDoPrograma => {
+            
+            const btn = document.createElement("button");
+            btn.className = "btn-programa";
+            btn.innerText = `Correr ${nomeDoPrograma}`;
+            
+            btn.addEventListener("click", () => {
+                console.log(`A pedir ao servidor para correr: ${nomeDoPrograma}`);
+                socket.emit("comando_programa", nomeDoPrograma);
+            });
+            
+            contentor.appendChild(btn);
+        });
+    });
+
+    socket.on("send_program_running", (data) => {
+        const programas = data;
+        const contentor = document.getElementById("programs-running-container");
+        contentor.innerHTML = "";
+        programas.forEach(nomeDoPrograma => {
+            
+            const btn = document.createElement("button");
+            btn.className = "btn-programa";
+            btn.innerText = `Acabar com ${nomeDoPrograma}`;
+            
+            btn.addEventListener("click", () => {
+                socket.emit("end_program", nomeDoPrograma);
+            });
+            
+            contentor.appendChild(btn);
+        });
+    });
+
+
+
+    socket.on("send_status", (data) => {
+        el.lastUpdate.textContent = "última atualização: " + new Date().toLocaleTimeString("pt-PT");
+    });
+
+    socket.on("alerta_sistema", (mensagem) => {
+        alert(mensagem);
+    });
+
+    
+    el.restart.addEventListener("click", function (e) {
+        socket.emit("restart");
+    });
+
+    el.shutdown.addEventListener("click", function (e) {
+        socket.emit("shutdown");
+    });
+
+    /*
+    function requestmsg(){
+        socket.emit("request_msg")
+    }
+
+    chats = document.getElementById("chat")
+
+    socket.on("send_chat", (data) => {
+        chat = ""
+        for (let i = 0; i < data.length; i++) {
+            console.log(data[i])
+            chat += `<div id = "msg_container">
+                <div id = nome_chat>${data[i].nome}</div>
+                <div id = msg_chat>${data[i].msg}</div>
+                <div id = hora>${data[i].time}</div>
+                </div>`
+        }
+        chats.innerHTML = chat
+    });
+
+    socket.on("pong", (data) => {
+        console.log("Server replied:", data);
+    });
+
+    btn = document.getElementById("btn")
+    msg = document.getElementById("msg")
+    nome = document.getElementById("nome")
+
+    btn.addEventListener("click", function (e) {
+        if (nome.value !== "" && msg.value !== ""){
+            socket.emit("send_msg", {
+                nome : nome.value,
+                msg : msg.value,
+                time: new Date().toLocaleTimeString()
+            });
+        }
+    });
+    */
+</script>
+</html>
