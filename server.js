@@ -3,12 +3,13 @@ const path = require('path')
 const si = require('systeminformation');
 const { exec } = require('child_process');
 const fs = require('fs').promises;
-const io = require('socket.io')(3000,{
+const Config = require('./public/JS/config.js');
+const io = require('socket.io')(Config.Servidor.portacom,{
   cors: {
     origin: "*"
   }
 })
-const port = 80
+const port = Config.Servidor.portasocket
 const app = express()
 var chat = []
 
@@ -41,18 +42,15 @@ app.get("/programas",(req,res)=>{
 async function obterEstatisticas() {
     try {
         const cpu = await si.currentLoad();
-        //console.log(`Uso do CPU: ${cpu.currentLoad.toFixed(2)}%`);
 
         const ram = await si.mem();
         const ramUsadaGB = ram.active / (1024 ** 3);
         const ramTotalGB = ram.total / (1024 ** 3);
-        //console.log(`RAM Usada: ${ramUsadaGB.toFixed(2)} GB / ${ramTotalGB.toFixed(2)} GB`);
 
         const discos = await si.fsSize();
-        const discosDesejados = ['/', '/mnt/C', '/mnt/D'];
+        const discosDesejados = Config.Discos;
         const discosFiltrados = discos.filter(disco => discosDesejados.includes(disco.mount));
         const discoPrincipal = discosFiltrados[0];
-        //console.log(`Disco ${discoPrincipal.fs}: ${discoPrincipal.use}% usado.`);
 
         data = {
             cpu: cpu.currentLoad.toFixed(2),
@@ -69,7 +67,7 @@ async function obterEstatisticas() {
 
 async function procurarScriptsRunning() {
     try {
-        const sessionsRaw = await fs.readdir('/run/screen/S-rex');
+        const sessionsRaw = await fs.readdir('/run/screen/S-' + Config.Sistema.utilizadorAdmin);
 
         const sessions = sessionsRaw.map((name) => {
             const posicao = name.indexOf(".");
@@ -87,7 +85,7 @@ async function procurarScriptsRunning() {
 
 async function procurarScripts() {
     try {
-        const todosOsFicheiros = await fs.readdir('/home/rex');
+        const todosOsFicheiros = await fs.readdir(Config.Sistema.pastaScripts);
 
         const scripts = todosOsFicheiros.filter(ficheiro => ficheiro.endsWith('.sh'));
 
@@ -153,7 +151,7 @@ io.on("connection", (socket) => {
             return;
         }
 
-        const caminhoCompleto = `/home/rex/${nomeDoPrograma}`;
+        const caminhoCompleto = `${Config.Sistema.pastaScripts}/${nomeDoPrograma}`;
 
         exec(`bash ${caminhoCompleto}`, (erro, stdout, stderr) => {
             
@@ -173,7 +171,6 @@ io.on("connection", (socket) => {
                 socket.emit("alerta_sistema", `Aviso do ${nomeDoPrograma}: ${stderr}`);
             }
 
-            //console.log(`Sucesso! Resultado do ${nomeDoPrograma}:\n${stdout}`);
             socket.emit("alerta_sistema", `${nomeDoPrograma} Iniciado com sucesso.`);
 
         });
@@ -212,6 +209,7 @@ io.on("connection", (socket) => {
         exec("sudo /sbin/shutdown -h now", (erro, stdout, stderr) => {
             if (erro) {
                 console.error(`Erro ao desligar: ${erro.message}`);
+                socket.emit("alerta_sistema", `Erro ao desligar: ${erro.message}`);
                 return;
             }
         });
@@ -223,6 +221,7 @@ io.on("connection", (socket) => {
         exec("sudo /sbin/reboot", (erro, stdout, stderr) => {
             if (erro) {
                 console.error(`Erro ao reiniciar: ${erro.message}`);
+                socket.emit("alerta_sistema", `Erro ao reiniciar: ${erro.message}`);
                 return;
             }
         });
@@ -233,7 +232,6 @@ io.on("connection", (socket) => {
 
         clearInterval(meuLoop); 
         
-        //console.log("Loop destruído com sucesso. CPU em repouso!");
     });
 
 });

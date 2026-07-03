@@ -7,6 +7,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="../css/css.css">
+    <script src="../JS/config.js"></script>
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <title>RexServer</title>
 </head>
@@ -19,7 +20,6 @@
             <div id="navbar">
                 <a href="/" id="section">Status</a>
                 <a href="programas" id="section">Program</a>
-                <a href="http://rexserver:40120" id="section">TX</a>
             </div>
             <div id="conn">
                 <span id="conn-dot"></span>
@@ -76,9 +76,18 @@
         connDot: document.getElementById("conn-dot"),
         connLabel: document.getElementById("conn-label"),
         lastUpdate: document.getElementById("last-update"),
+        navbar: document.getElementById("navbar"),
     };
 
-    const socket = io("http://rexserver:3000");
+    if (Config.addTx) {
+        const txLink = document.createElement("a");
+        txLink.href = `https://${Config.Servidor.ip}:40120`;
+        txLink.id = "section";
+        txLink.textContent = "TX";
+        el.navbar.appendChild(txLink);
+    }
+
+    const socket = io(`http://${Config.Servidor.ip}:${Config.Servidor.portacom}`);
 
     function requestprogram(){
         socket.emit("request_program");
@@ -102,7 +111,7 @@
     socket.on("send_program", (data) => {
         const programas = data;
         const contentor = document.getElementById("programs-container");
-        contentor.innerHTML = ""; // Limpa a lista antiga para não duplicar
+        contentor.innerHTML = "";
         programas.forEach(nomeDoPrograma => {
             
             const btn = document.createElement("button");
@@ -155,43 +164,5 @@
         socket.emit("shutdown");
     });
 
-    /*
-    function requestmsg(){
-        socket.emit("request_msg")
-    }
-
-    chats = document.getElementById("chat")
-
-    socket.on("send_chat", (data) => {
-        chat = ""
-        for (let i = 0; i < data.length; i++) {
-            console.log(data[i])
-            chat += `<div id = "msg_container">
-                <div id = nome_chat>${data[i].nome}</div>
-                <div id = msg_chat>${data[i].msg}</div>
-                <div id = hora>${data[i].time}</div>
-                </div>`
-        }
-        chats.innerHTML = chat
-    });
-
-    socket.on("pong", (data) => {
-        console.log("Server replied:", data);
-    });
-
-    btn = document.getElementById("btn")
-    msg = document.getElementById("msg")
-    nome = document.getElementById("nome")
-
-    btn.addEventListener("click", function (e) {
-        if (nome.value !== "" && msg.value !== ""){
-            socket.emit("send_msg", {
-                nome : nome.value,
-                msg : msg.value,
-                time: new Date().toLocaleTimeString()
-            });
-        }
-    });
-    */
 </script>
 </html>
